@@ -37,9 +37,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 import static org.apache.dubbo.common.constants.CommonConstants.ANYHOST_VALUE;
+import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_IP_TO_BIND;
 import static org.apache.dubbo.common.constants.CommonConstants.LOCALHOST_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.LOCALHOST_VALUE;
-import static org.apache.dubbo.common.constants.ConfigConstants.DUBBO_IP_TO_BIND;
 
 /**
  * IP and Port Helper for RPC
@@ -178,6 +178,17 @@ public class NetUtils {
             }
         }
         return address;
+    }
+
+    private static volatile String HOST_ADDRESS;
+
+    public static String getHostAddress () {
+        if (HOST_ADDRESS != null) {
+            return HOST_ADDRESS;
+        }
+
+        HOST_ADDRESS = getLocalHost();
+        return HOST_ADDRESS;
     }
 
     public static String getLocalHost() {
@@ -371,13 +382,25 @@ public class NetUtils {
             while (addresses.hasMoreElements()) {
                 InetAddress address = (InetAddress) addresses.nextElement();
                 if (preferIpv6 && address instanceof Inet6Address) {
-                    multicastSocket.setInterface(address);
-                    interfaceSet = true;
-                    break;
+                    try {
+                        if(address.isReachable(100)){
+                            multicastSocket.setInterface(address);
+                            interfaceSet = true;
+                            break;
+                        }
+                    } catch (IOException e) {
+                        // ignore
+                    }
                 } else if (!preferIpv6 && address instanceof Inet4Address) {
-                    multicastSocket.setInterface(address);
-                    interfaceSet = true;
-                    break;
+                    try {
+                        if(address.isReachable(100)){
+                            multicastSocket.setInterface(address);
+                            interfaceSet = true;
+                            break;
+                        }
+                    } catch (IOException e) {
+                        // ignore
+                    }
                 }
             }
             if (interfaceSet) {
@@ -410,7 +433,7 @@ public class NetUtils {
             throw new IllegalArgumentException("Illegal Argument pattern or hostName. Pattern:" + pattern + ", Host:" + host);
         }
         pattern = pattern.trim();
-        if (pattern.equals("*.*.*.*") || pattern.equals("*")) {
+        if ("*.*.*.*".equals(pattern) || "*".equals(pattern)) {
             return true;
         }
 
@@ -446,7 +469,7 @@ public class NetUtils {
             }
         }
         for (int i = 0; i < mask.length; i++) {
-            if (mask[i].equals("*") || mask[i].equals(ipAddress[i])) {
+            if ("*".equals(mask[i]) || mask[i].equals(ipAddress[i])) {
                 continue;
             } else if (mask[i].contains("-")) {
                 String[] rangeNumStrs = mask[i].split("-");

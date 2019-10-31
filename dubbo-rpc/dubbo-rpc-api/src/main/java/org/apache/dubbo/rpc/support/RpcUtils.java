@@ -27,16 +27,13 @@ import org.apache.dubbo.rpc.RpcInvocation;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.dubbo.common.constants.RpcConstants.$INVOKE;
-import static org.apache.dubbo.common.constants.RpcConstants.$INVOKE_ASYNC;
+import static org.apache.dubbo.common.constants.CommonConstants.$INVOKE;
+import static org.apache.dubbo.common.constants.CommonConstants.$INVOKE_ASYNC;
 import static org.apache.dubbo.rpc.Constants.ASYNC_KEY;
 import static org.apache.dubbo.rpc.Constants.AUTO_ATTACH_INVOCATIONID_KEY;
-import static org.apache.dubbo.rpc.Constants.FUTURE_GENERATED_KEY;
 import static org.apache.dubbo.rpc.Constants.ID_KEY;
 import static org.apache.dubbo.rpc.Constants.RETURN_KEY;
 /**
@@ -94,7 +91,7 @@ public class RpcUtils {
     }
 
     public static Long getInvocationId(Invocation inv) {
-        String id = inv.getAttachment(ID_KEY);
+        String id = (String)inv.getAttachment(ID_KEY);
         return id == null ? null : new Long(id);
     }
 
@@ -171,8 +168,17 @@ public class RpcUtils {
     }
 
     public static boolean isReturnTypeFuture(Invocation inv) {
-        Class<?> clazz = getReturnType(inv);
+        Class<?> clazz;
+        if (inv instanceof RpcInvocation) {
+            clazz = ((RpcInvocation) inv).getReturnType();
+        } else {
+            clazz = getReturnType(inv);
+        }
         return (clazz != null && CompletableFuture.class.isAssignableFrom(clazz)) || isGenericAsync(inv);
+    }
+
+    public static boolean isGenericAsync(Invocation inv) {
+        return $INVOKE_ASYNC.equals(inv.getMethodName());
     }
 
     public static InvokeMode getInvokeMode(URL url, Invocation inv) {
@@ -185,10 +191,6 @@ public class RpcUtils {
         }
     }
 
-    public static boolean isGenericAsync(Invocation inv) {
-        return $INVOKE_ASYNC.equals(inv.getMethodName());
-    }
-
     public static boolean isOneway(URL url, Invocation inv) {
         boolean isOneway;
         if (Boolean.FALSE.toString().equals(inv.getAttachment(RETURN_KEY))) {
@@ -198,12 +200,4 @@ public class RpcUtils {
         }
         return isOneway;
     }
-
-    public static Map<String, String> getNecessaryAttachments(Invocation inv) {
-        Map<String, String> attachments = new HashMap<>(inv.getAttachments());
-        attachments.remove(ASYNC_KEY);
-        attachments.remove(FUTURE_GENERATED_KEY);
-        return attachments;
-    }
-
 }
